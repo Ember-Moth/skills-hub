@@ -18,12 +18,14 @@ Use this file to choose the correct module before hand-building UI.
 - `checkbox`, `radio`, `switch`, `slider`, `select`: common choice controls.
 - `form`, `label`, `description_list`, `group_box`, `setting`: form layout and settings surfaces.
 - `color_picker`, `date_picker`, `calendar`: specialized value pickers.
+- `clipboard`, `kbd`, `link`: copy-to-clipboard, keyboard shortcut display, and link-style actions.
 
 ## Navigation and Layout
 
 - `menu`: app menu bar, context menu, dropdown menu, menu items, popup menu.
 - `tab`: tabs and tab bars.
 - `breadcrumb`, `sidebar`, `accordion`, `collapsible`, `resizable`, `divider`, `scroll`.
+- `title_bar`: custom title bar and window controls where supported.
 - `dock`: dock area, side docks, panels, split/tabs/tiles, persisted dock state.
 
 ## Data and Large Lists
@@ -38,6 +40,10 @@ Use this file to choose the correct module before hand-building UI.
 - `highlighter`: tree-sitter highlighter/editor integration.
 - `chart`, `plot`: charts and plotting primitives.
 - `avatar`, `badge`, `alert`, `tag`, `kbd`, `link`, `progress`, `spinner`, `skeleton`.
+
+## Docs-Only or Version-Sensitive Names
+
+The local upstream docs checkout may mention components such as `AlertDialog`, `Combobox`, `HoverCard`, `Image`, `Pagination`, `Rating`, `StatusBar`, `Stepper`, or `FocusTrap`. These names were not exported as public modules in crates.io `gpui-component 0.5.1` during this skill's verification. Do not use them against `0.5.1` without inspecting the target project's resolved source.
 
 ## Theme, Icons, and Styling
 

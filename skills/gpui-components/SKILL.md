@@ -26,11 +26,13 @@ This is a portable skill for different users, repositories, and agents. Do not a
 5. Load only the references needed for the task:
    - `references/quickstart.md` for dependency setup, `gpui_component::init`, assets, and `Root`.
    - `references/component-map.md` for choosing components by UI need.
+   - `references/docs-distilled.md` for distilled notes from the local upstream docs checkout, including component selection guidance, design intent, and docs-vs-0.5.1 compatibility warnings.
    - `references/usage-patterns.md` for stateful components, inputs, dialogs, notifications, and styling.
    - `references/api-manual.md` for a practical API manual organized by subsystem.
    - `references/api-cheatsheet.md` for common constructors and builder methods.
    - `references/assets.md` for `gpui-component-assets`, `IconName`, and custom icons.
    - `references/source-fallback.md` when an API is missing or version-specific.
+   - `references/style-guide.md` for code style conventions when writing gpui-component code.
 6. For new apps, set up `Application::new().with_assets(gpui_component_assets::Assets)`, call `gpui_component::init(cx)`, and wrap the first window view with `Root::new(view, window, cx)`.
 7. For established projects, follow existing patterns first and replace hand-built controls incrementally.
 8. Run `cargo check` or the repository's existing validation command after edits when feasible.
@@ -46,6 +48,7 @@ Use library components for ordinary desktop UI:
 - Collections: `List`, `Table`, `VirtualList`, `IndexPath`.
 - Shells: `DockArea`, `DockItem`, `Panel`, `TabBar`, menus, sidebars, breadcrumbs.
 - Presentation: `Alert`, `Badge`, `Avatar`, `Label`, `TextView`, `Icon`, `Progress`, `Spinner`, `Skeleton`.
+- Documentation-derived patterns: use `references/docs-distilled.md` to understand common examples, but verify APIs that are marked docs-only or version-sensitive.
 
 Only hand-build raw GPUI widgets when the component library does not provide the required behavior or the UI is intentionally custom.
 

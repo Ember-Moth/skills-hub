@@ -13,6 +13,7 @@ This is a practical API manual for `gpui-component = "0.5.1"` with `gpui = "0.2.
 - Lists
 - Tables
 - Tabs, menus, and navigation
+- Trees, sliders, and grouped controls
 - Dock layouts and panels
 - Text, markdown, alerts, badges, and presentation
 - Optional features
@@ -54,6 +55,12 @@ cx.open_window(WindowOptions::default(), |window, cx| {
 - `open_dialog`, `has_active_dialog`, `close_dialog`, `close_all_dialogs`
 - `push_notification`, `remove_notification`, `clear_notifications`, `notifications`
 - `focused_input`, `has_focused_input`
+
+When building a custom first-level surface, Root also exposes optional overlay layers:
+
+- `Root::render_dialog_layer(window, cx)`
+- `Root::render_sheet_layer(window, cx)`
+- `Root::render_notification_layer(window, cx)`
 
 ## Styling, Size, Themes, Icons
 
@@ -125,6 +132,28 @@ Variants from `ButtonVariants`:
 
 `ButtonVariant::Secondary` is the default. There is no `.secondary()` helper in `0.5.1`; omit a variant for secondary style.
 
+### ButtonGroup, DropdownButton, Toggle
+
+`ButtonGroup::new(id)` joins buttons into a single visual/selectable group.
+
+Useful builders: `.child(button)`, `.children(buttons)`, `.multiple(bool)`, `.layout(Axis)`, `.compact()`, `.outline()`, `.disabled(bool)`, `.on_click(|&Vec<usize>, &mut Window, &mut App| ...)`, size helpers, and `ButtonVariants`.
+
+`DropdownButton::new(id)` pairs a button with a `PopupMenu`:
+
+```rust
+DropdownButton::new("actions")
+    .button(Button::new("actions-main").label("Actions"))
+    .dropdown_menu(|menu, _window, _cx| {
+        menu.menu("Refresh", Box::new(Refresh))
+    })
+```
+
+Builders: `.button(Button)`, `.dropdown_menu(...)`, `.dropdown_menu_with_anchor(anchor, ...)`, `.rounded(...)`, `.compact()`, `.outline()`, `.loading(bool)`, `.disabled(bool)`, `.selected(bool)`, size helpers, and `ButtonVariants`.
+
+`Toggle::new(id)` is a persistent on/off toolbar button. Builders: `.label(...)`, `.icon(...)`, `.checked(bool)`, `.on_click(...)`, `.disabled(bool)`, `.ghost()`, `.outline()`, size helpers.
+
+`ToggleGroup::new(id)` renders multiple toggles and calls `.on_click(|&Vec<bool>, ...| ...)` with the new checked state for every child.
+
 ### Checkbox
 
 ```rust
@@ -141,7 +170,7 @@ Builders: `.label(...)`, `.checked(bool)`, `.disabled(bool)`, `.tab_stop(bool)`,
 
 ### Radio
 
-`Radio` is a single radio control. Manage grouping in parent state.
+`Radio` is a single radio control. Use `RadioGroup` when its built-in layout is sufficient; manage individual radios in parent state when custom layout is required.
 
 ```rust
 Radio::new("mode-basic")
@@ -156,6 +185,8 @@ Radio::new("mode-basic")
 ```
 
 Builders: `.label(...)`, `.checked(bool)`, `.disabled(bool)`, `.tab_index(isize)`, `.tab_stop(bool)`, `.on_click(...)`, size helpers.
+
+`RadioGroup::vertical(id)` and `RadioGroup::horizontal(id)` builders: `.layout(Axis)`, `.selected_index(Option<usize>)`, `.disabled(bool)`, `.child(radio)`, `.children(radios)`, `.on_click(|&usize, &mut Window, &mut App| ...)`.
 
 ### Switch
 
@@ -227,6 +258,7 @@ Input::new(&self.name)
 - `.placeholder(text)`
 - `.line_number(bool)`
 - `.rows(usize)`
+- `.tab_size(TabSize { tab_size, hard_tabs })`
 - `.masked(bool)`
 - `.clean_on_escape()`
 - `.soft_wrap(bool)`
@@ -244,7 +276,25 @@ Input::new(&self.name)
 
 `NumberInput::new(&input_state)` provides numeric step behavior and accepts `.placeholder(...)`, `.prefix(...)`, `.suffix(...)`, `.appearance(bool)`.
 
+`NumberInput` emits `NumberInputEvent::Step(StepAction::Increment | StepAction::Decrement)` on its `InputState`; subscribe from the parent to update the value and enforce numeric policy.
+
 `OtpState::new(length, window, cx)` and `OtpInput::new(&state)` provide one-time-password input. `OtpInput` supports `.groups(n)`.
+
+Code editor mode:
+
+```rust
+let state = cx.new(|cx| {
+    InputState::new(window, cx)
+        .code_editor("rust")
+        .line_number(true)
+        .searchable(true)
+        .soft_wrap(true)
+});
+
+Input::new(&state).h_full()
+```
+
+Use `gpui-component = { version = "0.5.1", features = ["tree-sitter-languages"] }` for bundled grammars. `InputState::code_editor` is for simple code editing/display, not a full IDE editor by itself.
 
 ## Select
 
@@ -428,11 +478,15 @@ List::new(&self.list)
 
 `ListItem::new(id)` is a ready list row element. Useful builders: `.separator()`, `.check_icon(...)`, `.selected(bool)`, `.confirmed(bool)`, `.disabled(bool)`, `.suffix(...)`, `.on_click(...)`, `.on_mouse_enter(...)`.
 
+`ListState` useful methods: `set_searchable`, `set_selectable`, `delegate`, `delegate_mut`, `focus`, `set_selected_index`, `selected_index`, `set_item_to_measure_index`, `scroll_to_item`, `scroll_handle`, `scroll_to_selected_item`.
+
+`List` builders: `List::new(&state)`, `.scrollbar_visible(bool)`, `.search_placeholder(text)`, size helpers, and normal `Styled` methods. Padding and `max_h` on `List` are forwarded to the inner virtual list.
+
 Use `IndexPath` for section/row addressing.
 
 ## Tables
 
-Use `Table` for large tabular datasets with virtualized rows/columns.
+Use `Table` for large tabular datasets with virtualized rows/columns. The upstream docs may call this `DataTable`; in crates.io `0.5.1`, the public type is `Table`.
 
 Implement `TableDelegate`:
 
@@ -495,6 +549,8 @@ Table::new(&self.table)
     .scrollbar_visible(true, true)
 ```
 
+Do not use docs examples that call `Table::new().child(TableRow...)` against `0.5.1`; public `0.5.1` table rendering is delegate-backed.
+
 ## Tabs, Menus, and Navigation
 
 ### Tabs
@@ -537,6 +593,70 @@ Table::new(&self.table)
 - `.separator()`, `.submenu(...)`, `.item(...)`, `.is_empty()`
 
 For context menus, use `ContextMenuExt`/`ContextMenu` from `menu` and verify exact project pattern in source.
+
+### Context Menu
+
+Any `ParentElement + Styled` can use `ContextMenuExt::context_menu(...)`:
+
+```rust
+div().context_menu(|menu, _window, _cx| {
+    menu.menu("Copy", Box::new(CopyAction))
+})
+```
+
+This wraps the element and shows a `PopupMenu` on right click. Use actions for commands when possible.
+
+## Trees, Sliders, and Grouped Controls
+
+### Tree
+
+Use `Tree` for hierarchical data.
+
+```rust
+let tree = cx.new(|cx| {
+    TreeState::new(cx).items(vec![
+        TreeItem::new("src", "src")
+            .expanded(true)
+            .child(TreeItem::new("src/lib.rs", "lib.rs")),
+    ])
+});
+
+Tree::new(&tree, |ix, entry, selected, _window, _cx| {
+    ListItem::new(ix)
+        .selected(selected)
+        .child(Label::new(entry.item().label.clone()))
+})
+```
+
+`TreeItem` builders: `new(id, label)`, `.child(...)`, `.children(...)`, `.expanded(bool)`, `.disabled(bool)`.
+
+`TreeState` methods: `TreeState::new(cx)`, `.items(...)`, `set_items`, `selected_index`, `set_selected_index`, `scroll_to_item`, `selected_entry`.
+
+Render with `Tree::new(&state, render_item)` or `tree(&state, render_item)`.
+
+### Slider
+
+Use `SliderState` plus `Slider` for single-value or range values.
+
+```rust
+let state = cx.new(|_| {
+    SliderState::new()
+        .min(0.)
+        .max(100.)
+        .step(5.)
+        .default_value(40.)
+});
+
+Slider::new(&state).horizontal()
+```
+
+State builders/methods: `SliderState::new()`, `.min(f32)`, `.max(f32)`, `.step(f32)`, `.scale(SliderScale::Linear | SliderScale::Logarithmic)`, `.default_value(...)`, `set_value`, `value`.
+
+`SliderValue` accepts `f32`, `(f32, f32)`, and `Range<f32>`. It exposes `is_single`, `is_range`, `start`, and `end`.
+
+`Slider` builders: `Slider::new(&state)`, `.horizontal()`, `.vertical()`, `.disabled(bool)`, and `Styled`.
+
+Subscribe to `SliderEvent::Change(SliderValue)` on `SliderState` for parent updates.
 
 ## Dock Layouts and Panels
 
@@ -642,6 +762,8 @@ Builders: `.dot()`, `.count(usize)`, `.icon(...)`, `.max(usize)`, `.color(hsla)`
 ### Other Presentation Components
 
 Check `component-map.md` for `avatar`, `breadcrumb`, `description_list`, `group_box`, `kbd`, `link`, `progress`, `spinner`, `skeleton`, `tag`, `chart`, and `plot`. If the manual does not list a method, use `source-fallback.md`.
+
+For distilled notes from the upstream docs checkout, including components that are documented upstream but absent from crates.io `0.5.1`, see `docs-distilled.md`.
 
 ## Optional Features
 

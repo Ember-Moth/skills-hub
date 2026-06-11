@@ -33,6 +33,52 @@ This is a portable skill intended for different users, repositories, and agents.
 9. If an API is not covered, inspect the local GPUI dependency or pinned source, then keep the final code aligned with the verified source.
 10. When using crates.io `gpui`, prefer the cached registry package discovered by the bundled `scripts/locate-gpui-cache.sh` before browsing remote source.
 
+## Deep-Dive References
+
+Upstream GPUI framework references organized by topic. Load these when the workflow references above do not cover the specific API or pattern in depth.
+
+### Core Concepts
+
+| Topic | File | When to load |
+|-------|------|--------------|
+| Actions & keybindings | [action.md](references/action.md) | `actions!`, `bind_keys`, `on_action`, `key_context` |
+| Async & background tasks | [async.md](references/async.md) | `cx.spawn`, `background_spawn`, `Task`, async I/O |
+| Context management | [context.md](references/context.md) | `App`, `Window`, `Context<T>`, `AsyncApp` |
+| Events & subscriptions | [event.md](references/event.md) | `cx.emit`, `cx.subscribe`, `cx.observe` |
+| Focus & keyboard nav | [focus-handle.md](references/focus-handle.md) | `FocusHandle`, `track_focus`, Tab navigation |
+| Global state | [global.md](references/global.md) | `Global` trait, `cx.set_global`, app-wide config |
+| Layout & styling | [layout-style.md](references/layout-style.md) | `div()`, `h_flex()`, `v_flex()`, flexbox, overflow, positioning |
+| ElementId | [element-id.md](references/element-id.md) | `ElementId`, `.id()`, uniqueness rules, stateful elements |
+
+### Element Trait
+
+| Topic | File | When to load |
+|-------|------|--------------|
+| Custom elements (overview) | [element.md](references/element.md) | `Element` trait, `request_layout`, `prepaint`, `paint` |
+| Element API reference | [element-api.md](references/element-api.md) | Complete API, hitbox system, event handling |
+| Element patterns | [element-patterns.md](references/element-patterns.md) | Text, interactive, container, composite patterns |
+| Element examples | [element-examples.md](references/element-examples.md) | Full examples: text, interactive, complex elements |
+| Element best practices | [element-best-practices.md](references/element-best-practices.md) | Performance, state, common pitfalls |
+| Element advanced | [element-advanced.md](references/element-advanced.md) | Masonry/circular layouts, async updates, virtual lists |
+
+### Entity Management
+
+| Topic | File | When to load |
+|-------|------|--------------|
+| Entity state (overview) | [entity.md](references/entity.md) | `Entity<T>`, `WeakEntity`, state management |
+| Entity API reference | [entity-api.md](references/entity-api.md) | Complete Entity API, methods, lifecycle |
+| Entity patterns | [entity-patterns.md](references/entity-patterns.md) | Model-view, cross-entity communication, observer |
+| Entity best practices | [entity-best-practices.md](references/entity-best-practices.md) | Memory, performance, lifecycle |
+| Entity advanced | [entity-advanced.md](references/entity-advanced.md) | Collections, registry, debounce, state machines |
+
+### Testing
+
+| Topic | File | When to load |
+|-------|------|--------------|
+| Testing overview | [test.md](references/test.md) | `#[gpui::test]`, `TestAppContext`, `VisualTestContext` |
+| Testing examples | [test-examples.md](references/test-examples.md) | Testing examples and patterns |
+| Testing API reference | [test-reference.md](references/test-reference.md) | Complete testing API reference |
+
 ## Templates
 
 Use `assets/templates/minimal-app` for the smallest runnable GPUI application once the template is populated.

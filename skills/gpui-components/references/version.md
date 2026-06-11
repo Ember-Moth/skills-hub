@@ -21,6 +21,18 @@ This skill targets the crates.io GPUI Component package family.
 
 The skill name is plural because it covers the package family. The actual dependency package names are singular: `gpui-component`, `gpui-component-assets`, and `gpui-component-macros`.
 
+## Local Upstream Docs Checkout
+
+Some environments may also have a Cargo git checkout of the upstream repository, for example:
+
+```text
+${CARGO_HOME:-$HOME/.cargo}/git/checkouts/gpui-component-*/<rev>/docs
+```
+
+The local checkout inspected for this skill was revision `87521042`, whose workspace declares `gpui-component = 0.5.2` and git-based GPUI dependencies. It is useful for design intent and examples, but this skill's executable API baseline remains crates.io `gpui-component = 0.5.1` with `gpui = 0.2.2`.
+
+Use `references/docs-distilled.md` for distilled notes from that docs tree. Use `references/api-manual.md` and `scripts/list-public-api.sh` as the authority for `0.5.1` method names.
+
 ## Feature Flags
 
 `gpui-component 0.5.1` exposes these notable features:
