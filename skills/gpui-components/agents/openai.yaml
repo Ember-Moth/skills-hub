@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPUI Components"
+  short_description: "Use GPUI Component instead of hand-built widgets."
+  default_prompt: "Use $gpui-components to build this GPUI interface with reusable components."
