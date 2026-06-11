@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPUI"
+  short_description: "Teach Codex practical Rust GPUI app patterns."
+  default_prompt: "Use $gpui to build, modify, or debug this Rust GPUI application."
