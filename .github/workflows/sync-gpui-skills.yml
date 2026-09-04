@@ -1,8 +1,7 @@
 name: Sync gpui-kit skills from upstream
 
 # Weekly sync of skills/gpui-kit and skills/gpui-kit-design-guides from
-# longbridge/gpui-kit@main. Opens (or updates) a PR when upstream changed;
-# never pushes to main directly.
+# longbridge/gpui-kit@main. Commits directly to main when upstream changed.
 
 on:
   schedule:
@@ -11,12 +10,10 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 env:
   UPSTREAM_REPO: longbridge/gpui-kit
   UPSTREAM_REF: main
-  BRANCH: sync/gpui-kit-upstream
 
 jobs:
   sync:
@@ -49,41 +46,15 @@ jobs:
             cp -R "/tmp/upstream/skills/$d" "skills/$d"
           done
 
-      - name: Check for changes
-        id: changed
-        run: |
-          if git diff --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Already in sync with ${UPSTREAM_REPO}@${UPSTREAM_SHA}."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit and push sync branch
-        if: steps.changed.outputs.changed == 'true'
+      - name: Commit and push if changed
         run: |
           set -euo pipefail
+          if git diff --quiet; then
+            echo "Already in sync with ${UPSTREAM_REPO}@${UPSTREAM_SHA}."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "$BRANCH"
           git add skills/gpui-kit skills/gpui-kit-design-guides
           git commit -m "Sync gpui-kit skills from ${UPSTREAM_REPO}@${UPSTREAM_SHA}"
-          git push --force-with-lease origin "$BRANCH"
-
-      - name: Create or reuse pull request
-        if: steps.changed.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if gh pr list --head "$BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "Sync gpui-kit skills from upstream (${UPSTREAM_SHA})" \
-              --body "Automated sync of \`skills/gpui-kit\` and \`skills/gpui-kit-design-guides\` from [${UPSTREAM_REPO}@${UPSTREAM_SHA}](https://github.com/${UPSTREAM_REPO}/tree/${UPSTREAM_SHA}/skills).
-
-          Review the diff, then merge to adopt the upstream changes."
-          else
-            echo "Open PR for $BRANCH already exists; branch was updated."
-          fi
+          git push
