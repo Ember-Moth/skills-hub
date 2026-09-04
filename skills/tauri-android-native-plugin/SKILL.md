@@ -446,15 +446,17 @@ tauri-plugin-mything/
 └── docs/{api,usage}.md
 ```
 
-## References in This Project
+## Reference Implementations
 
-When implementing another Tauri plugin that wraps a native lib, study the layouts in:
+When implementing another Tauri plugin that wraps a native lib, study these
+public repositories (clone them locally rather than assuming any fixed path):
 
-- `/root/npanel/tauri-plugin-xray/android/src/main/kotlin/app/tauri/xray/` — full implementation
-- `/root/npanel/tauri-plugin-xray/src/` — Rust side, including dual mobile/desktop split
-- `/root/npanel/v2rayNG/V2rayNG/app/src/main/java/com/v2ray/ang/` — battle-tested reference patterns:
+- Your own previous plugin's `android/src/main/kotlin/<pkg>/` and `src/` —
+  the full plugin layout, including the dual mobile/desktop split.
+- [v2rayNG](https://github.com/2dust/v2rayNG) (`V2rayNG/app/src/main/java/com/v2ray/ang/`) — battle-tested VPN/service patterns:
   - `service/CoreVpnService.kt` — VPN/service lifecycle
   - `service/CoreRootService.kt` — non-VPN service variant
-  - `core/CoreConfigManager.kt` — configuration builder pattern
-  - `core/CoreOutboundBuilder.kt` — protocol-specific config generation
-- `/root/npanel/AndroidLibXrayLite/` — the gomobile source for the AAR
+  - `core/CoreServiceManager.kt` — core start/stop orchestration
+  - `core/CoreConfigManager.kt` / `core/CoreOutboundBuilder.kt` — configuration builder pattern
+- [AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite) — the
+  gomobile source pattern for building an Xray-core AAR.
