@@ -1,0 +1,4 @@
+interface:
+  display_name: "DESIGN.md Workflow"
+  short_description: "Create, adopt, validate, and enforce DESIGN.md"
+  default_prompt: "Use $design-md to establish or review this project’s visual design system."
