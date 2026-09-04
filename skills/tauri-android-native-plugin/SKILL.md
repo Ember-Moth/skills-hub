@@ -5,6 +5,9 @@ description: Create a Tauri v2 Android plugin that wraps a native AAR library (e
 
 # Tauri v2 Android Native Plugin
 
+> API 已对照 Tauri v2.11.5（2026-09）核实：`Invoke`/`JSObject` 参数读取、`Plugin.load`、
+> `@TauriPlugin`/`@Command` 注解、权限文件结构均与当前版本一致。
+
 ## When to Use
 
 Use this skill when building a **Tauri v2 plugin that runs on Android only or has Android-specific behavior**, especially when:
@@ -70,21 +73,29 @@ class ExamplePlugin(...) : Plugin(...) {
 
 If you write `override fun load(webView: android.webkit.WebView)`, the parameter type differs from the parent class's `load(WebView)` and the lifecycle hook is silently dropped.
 
-**`invoke.getBoolean()` is two-arg, not nullable**
+**Argument getters live on `JSObject`, not on `Invoke`**
+
+`Invoke` itself only exposes `getRawArgs()`, `getArgs()`, and `parseArgs(cls)` —
+this is true for every Tauri v2 release, so `invoke.getBoolean(...)` never
+compiles. Get the `JSObject` first, or parse into a data class:
 
 ```kotlin
-// ❌ compile error: no such method
-val x = invoke.getBoolean("key") ?: false
-
-// ✅ correct API
+// ❌ compile error: Invoke has no getBoolean
 val x = invoke.getBoolean("key", false)
+
+// ✅ via JSObject (two-arg overload is non-null; the one-arg form can throw)
+val x = invoke.getArgs().getBoolean("key", false)
+
+// ✅ or parse all args into a data class with Jackson
+data class StartArgs(val key: Boolean = false, val name: String = "")
+val args = invoke.parseArgs(StartArgs::class.java)
 ```
 
 **Missing `androidx.activity` dependency**
 
 `registerForActivityResult(...)` requires:
 ```gradle
-implementation "androidx.activity:activity-ktx:1.9.0"
+implementation "androidx.activity:activity-ktx:1.13.0"
 ```
 
 **`as ComponentActivity` cast**
