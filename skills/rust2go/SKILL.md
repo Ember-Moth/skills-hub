@@ -79,6 +79,10 @@ fn main() {
 | `.compiler_arg(arg)` | Go 编译器额外参数 |
 | `.compiler_env(k, v)` | Go 编译器环境变量 |
 
+动态链接注意：`with_copy_lib` 只复制库文件，不配置运行时加载路径。`cargo run` 能跑是因为
+cargo 会设库搜索路径；直接执行二进制（或部署）时，需要 `LD_LIBRARY_PATH`（Linux）、
+`DYLD_LIBRARY_PATH` 或 rpath（macOS）、或把 `go.dll` 放到可执行文件旁 / `PATH` 上（Windows）。
+
 ### 手动生成 Go 代码（不依赖 build.rs）
 
 ```bash
@@ -177,6 +181,7 @@ impl RustCallback for RustCallbackImpl {
 | `i8`/`i16`/`i32`/`i64` | `int8`/`int16`/`int32`/`int64` | 值拷贝 |
 | `f32`/`f64` | `float32`/`float64` | 值拷贝 |
 | `bool` | `bool` | 值拷贝 |
+| `char` | `rune`（底层 `uint32_t`） | 值拷贝 |
 | `usize`/`isize` | `uint`/`int` | 值拷贝 |
 | `String` | `string` | 指针+长度（零拷贝） |
 | `Vec<Primitive>` | `[]Primitive` | 指针+长度（零拷贝） |
@@ -197,6 +202,11 @@ impl RustCallback for RustCallbackImpl {
 - 带生命周期的引用（除 `&str` → `String` 外）
 - `HashMap`、`BTreeMap` 等 map 类型
 
+### 类型别名
+
+非泛型类型别名可以直接用在字段和 trait 签名里（如 `pub type Amount = i64;`），
+代码生成时会被展开。循环别名会导致构建失败（报 `cyclic type alias detected`）。
+
 ## 属性参考
 
 ### trait 级别
@@ -212,11 +222,35 @@ impl RustCallback for RustCallbackImpl {
 
 | 属性 | 说明 |
 |---|---|
+| `#[send]` | 生成的 Future 带 `Send + Sync`（需要 spawn 到多线程 runtime 时使用） |
 | `#[drop_safe]` | async fn 不带引用参数，Future drop 安全 |
 | `#[drop_safe_ret]` | 更安全：drop 时返回参数所有权，可重新发起调用 |
-| `#[mem]` / `#[shm]` | 走共享内存 ring buffer（仅 oneway 或 async） |
+| `#[mem]` / `#[shm]` | 走共享内存 ring buffer（仅 oneway 或 async；**仅限 unix**） |
 | `#[cgo]` / `#[cgo_callback]` | 回调使用 CGO 而非 asmcall 汇编 |
-| `#[go_pass_struct]` | Go 侧参数传值不传指针 |
+| `#[go_pass_struct]` | Go 侧参数**传指针而非传值**（默认传值；参数较大时减少拷贝） |
+
+g2r 方向（Go→Rust）对应的 CGO 回退属性是 `#[cgo_call]`（别名 `#[cgo]`），语义相同。
+
+### struct 级别
+
+```rust
+// 为生成的 Go struct 字段加 tag，key 是 tag 名，value 是命名约定
+#[rust2go::r2g_struct_tag(json = "snake_case", yaml = "lowerCamelCase")]
+#[derive(rust2go::R2G, Clone)]
+pub struct User {
+    pub user_name: String,
+}
+// 生成：UserName string `json:"user_name" yaml:"userName"`
+```
+
+支持的命名约定：`snake_case`、`lowerCamelCase`、`UpperCamelCase`、`kebab-case`、
+`SHOUTY_SNAKE_CASE`、`SHOUTY-KEBAB-CASE`、`Title Case`、`Train-Case`。
+
+注意：Go 字段名**逐字拷贝** Rust 字段名，只有 tag 值会被转换。需要 Go 导出字段时，
+Rust 侧用大写字段名并加 `#[allow(non_snake_case)]`。
+
+派生 `R2G` 的 struct 自身的属性宏（如 `#[derive(Clone)]`、`#[allow(...)]`）会保留在
+生成的 `XxxRef` struct 上。
 
 ## Go 侧实现
 
@@ -318,6 +352,7 @@ let (resp, (req,)) = MyServiceImpl::process(req).await;
 - 每秒数千到数百万次调用
 - 需要避开 CGO 调用开销（G→M goroutine 切换）
 - oneway 或 request-response 异步模式
+- **仅限 unix 平台**（Linux/macOS）；Windows 不可用
 
 ### 用法
 
@@ -383,6 +418,14 @@ func (s Service) handle(user *User) {
 - **Go→Rust 仅支持同步调用**，不支持 async
 - 需要异步时在 Rust impl 中手动 `tokio::spawn`
 - 所有参数都会经过 `own{Type}()` 深拷贝
+
+## 工具链与平台要求
+
+- **Go ≥ 1.18**；1.18–1.19 需用 `--go118` 生成 Go 代码，≥1.20 正常生成
+- **Rust ≥ 1.75**（使用 async 时）；edition 2021/2024 均可，edition 2024 需 Rust ≥ 1.85
+- 支持 Linux / macOS / Windows
+- ASM 回调仅 amd64/arm64 可用，其他架构自动回退 CGO 实现
+- `#[mem]`/`#[shm]` 共享内存仅限 unix
 
 ## 运行
 
