@@ -1,0 +1,89 @@
+name: Sync gpui-kit skills from upstream
+
+# Weekly sync of skills/gpui-kit and skills/gpui-kit-design-guides from
+# longbridge/gpui-kit@main. Opens (or updates) a PR when upstream changed;
+# never pushes to main directly.
+
+on:
+  schedule:
+    - cron: "17 2 * * 1" # Mondays 02:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: longbridge/gpui-kit
+  UPSTREAM_REF: main
+  BRANCH: sync/gpui-kit-upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v5
+
+      - name: Download upstream skills
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/${UPSTREAM_REPO}/archive/refs/heads/${UPSTREAM_REF}.tar.gz" \
+            -o /tmp/upstream.tar.gz
+          mkdir -p /tmp/upstream
+          tar -xzf /tmp/upstream.tar.gz -C /tmp/upstream --strip-components=1
+          for d in gpui-kit gpui-kit-design-guides; do
+            test -d "/tmp/upstream/skills/$d" || {
+              echo "::error::upstream skills/$d not found — upstream layout changed?"
+              exit 1
+            }
+          done
+          echo "UPSTREAM_SHA=$(git ls-remote "https://github.com/${UPSTREAM_REPO}" "${UPSTREAM_REF}" | cut -c1-12)" \
+            >> "$GITHUB_ENV"
+
+      - name: Copy skills into place
+        run: |
+          set -euo pipefail
+          for d in gpui-kit gpui-kit-design-guides; do
+            rm -rf "skills/$d"
+            cp -R "/tmp/upstream/skills/$d" "skills/$d"
+          done
+
+      - name: Check for changes
+        id: changed
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already in sync with ${UPSTREAM_REPO}@${UPSTREAM_SHA}."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push sync branch
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add skills/gpui-kit skills/gpui-kit-design-guides
+          git commit -m "Sync gpui-kit skills from ${UPSTREAM_REPO}@${UPSTREAM_SHA}"
+          git push --force-with-lease origin "$BRANCH"
+
+      - name: Create or reuse pull request
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh pr list --head "$BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "Sync gpui-kit skills from upstream (${UPSTREAM_SHA})" \
+              --body "Automated sync of \`skills/gpui-kit\` and \`skills/gpui-kit-design-guides\` from [${UPSTREAM_REPO}@${UPSTREAM_SHA}](https://github.com/${UPSTREAM_REPO}/tree/${UPSTREAM_SHA}/skills).
+
+          Review the diff, then merge to adopt the upstream changes."
+          else
+            echo "Open PR for $BRANCH already exists; branch was updated."
+          fi
