@@ -1,12 +1,16 @@
 ---
 name: uniffi
 title: Rust uniffi
-description: 给已有 Rust 库添加 uniffi 0.31 proc-macros FFI 导出，生成 Kotlin 绑定。涵盖 FFI 包装层架构、Android NDK 交叉编译、Kotlin 绑定生成、以及生产环境 strip 工作流程。
+description: 给已有 Rust 库添加 uniffi proc-macros FFI 导出，生成 Kotlin 绑定。涵盖 FFI 包装层架构、Android NDK 交叉编译、Kotlin 绑定生成、以及生产环境 strip 工作流程。适用于 uniffi 0.31 和 0.32。
 tags: [rust, uniffi, android-ndk, kotlin, ffi, cross-compilation]
 ---
 # Rust uniffi
 
-给已有 Rust 库添加 uniffi 0.31 proc-macros FFI 导出，交叉编译 Android 版本（通过 NDK），生成 Kotlin 绑定。
+给已有 Rust 库添加 uniffi proc-macros FFI 导出，交叉编译 Android 版本（通过 NDK），生成 Kotlin 绑定。
+
+> **适用版本**：全部规则已在 uniffi 0.31 验证，并逐条核对 0.32 changelog 确认仍然成立。
+> 0.32 值得知道的新能力：`uniffi.toml` 支持 `excludes` 排除条目、proc-macro 支持 `HashSet`、
+> `Box<T>` 自动实现 FFI trait、支持递归 enum、Kotlin 侧 `&[u8]` 零拷贝传参。
 
 ## 前置判断：方案选择
 
@@ -140,7 +144,7 @@ uniffi::setup_scaffolding!();
 
 ### ⛔ 禁止
 
-- **NEVER 创建 .udl 文件**。uniffi 0.31 使用纯 proc-macro，用户拒绝任何 UDL 文件
+- **NEVER 创建 .udl 文件**。本 skill 使用纯 proc-macro 路线，用户拒绝任何 UDL 文件
 - **NEVER 在 `[profile.release]` 中设置 `strip=true`**——会销毁 `UNIFFI_META_*` 字符串段
 - **NEVER 在 `[profile.release]` 中设置 `lto=true`**——链接器会移除"未引用"的 uniffi 元数据
 - **NEVER 直接往核心类型上添加 uniffi 宏**——始终通过 `src/ffi.rs` 包装层进行
@@ -161,7 +165,7 @@ uniffi::setup_scaffolding!();
 
 ### 默认行为
 
-uniffi 0.31 会在 FFI 边界自动创建 tokio runtime。`#[uniffi::export] async fn` 将自动在该 runtime 上执行，无需手动干预：
+uniffi 会在 FFI 边界自动创建 tokio runtime。`#[uniffi::export] async fn` 将自动在该 runtime 上执行，无需手动干预：
 
 ```rust
 #[uniffi::export]
@@ -173,17 +177,18 @@ pub async fn search(query: String) -> Result<Vec<FfiSearchResult>, FfiEngineErro
 
 ### 避免跨 runtime 问题
 
-如果核心库内部使用了 `tokio::spawn`，被 spawn 的任务默认在当前 runtime 上执行。通过带 context 的方式传递 handle：
+如果核心库内部使用了 `tokio::spawn`，被 spawn 的任务需要在 uniffi 的 runtime 上执行。做法：核心库导出一个接受 `Handle` 的初始化函数，FFI 层在 uniffi runtime 里取当前 handle 传入：
 
 ```rust
-// 核心库导出一个接受 runtime handle 的初始化函数
+// 核心库：接受 runtime handle，而不是自己创建 runtime
+// pub async fn init_with_handle(handle: tokio::runtime::Handle) { ... }
+
 use tokio::runtime::Handle;
 
 #[uniffi::export]
-pub async fn init_engine(handle: Option<u64>) {
-    // uniffi 自动管理 runtime，大多数场景不需要手动传 handle
-    // 仅在核心库需要 spawn 子任务时，通过 Handle::current() 获取
-    crate::init().await;
+pub async fn init_engine() {
+    // Handle::current() 拿到的是 uniffi 管理的 runtime
+    crate::init_with_handle(Handle::current()).await;
 }
 ```
 
@@ -203,7 +208,7 @@ pub async fn init_engine(handle: Option<u64>) {
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-uniffi = "0.31"
+uniffi = "0.32"  # 0.31 同样适用，所有规则两个版本一致
 
 [features]
 uniffi-cli = ["uniffi/cli"]

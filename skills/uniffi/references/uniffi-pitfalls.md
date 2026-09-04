@@ -1,4 +1,4 @@
-# uniffi 0.31 陷阱
+# uniffi 陷阱（适用于 0.31 / 0.32）
 
 ## 错误排查优先级
 
@@ -8,7 +8,7 @@
 |------|-------------|--------|
 | 生成的 .kt 文件为空（没报错但没输出） | `strip=true` 销毁了元数据 | → 第 1 节 |
 | 生成的 .kt 文件为空（或者条目少） | `lto=true` 移除了元数据段 | → 第 2 节 |
-| `cargo install uniffi_bindgen` 失败（"无二进制文件"） | uniffi 0.31 未发布独立 cli crate | → 第 3 节 |
+| `cargo install uniffi_bindgen` 失败（"无二进制文件"） | 0.31/0.32 的 bindgen crate 均为纯库，无二进制 | → 第 3 节 |
 | `generate --library` 命令 panic | 缺少 `--out-dir` 参数 | → 第 4 节 |
 | 编译错误：`uniffi::Error` derive 失败 | Error 枚举使用了元组变体 | → 第 5 节 |
 | Kotlin 编译成功但 IDE 有格式警告 | ktlint 未安装 | → 第 6 节 |
@@ -46,8 +46,8 @@ uniffi 构建务必设置 `lto=false`。
 
 ## 3. `uniffi_bindgen` 二进制文件命名
 
-- uniffi 0.31 没有在 crates.io 上发布独立的 `uniffi_bindgen` crate。
-  `cargo install uniffi_bindgen --version "^0.31"` 会因"没有二进制文件"而失败。
+- uniffi 0.31 和 0.32 在 crates.io 上发布的 `uniffi_bindgen` crate 均为纯库（无二进制），
+  `cargo install uniffi_bindgen` 会因"没有二进制文件"而失败。
 - 正确的方法：在 Cargo.toml 中定义一个 `[[bin]]`，
   配合 `required-features = ["uniffi-cli"]`，然后执行
   `cargo run --features uniffi-cli --bin uniffi-bindgen`。
@@ -60,7 +60,7 @@ uniffi 构建务必设置 `lto=false`。
 
 ## 5. uniffi 的 Error 变体命名 + 已有 Error 类型的移植
 
-uniffi 0.31 的 `#[derive(uniffi::Error)]` 要求枚举变体有命名字段。
+`#[derive(uniffi::Error)]` 要求枚举变体有命名字段（0.31/0.32 均如此）。
 元组变体如 `ParseError(String)` 是不允许的。
 
 **核心原则：NEVER 修改核心库的 Error 类型。在 FFI 包装层新建 FfiError 并通过 From trait 映射。**
@@ -111,7 +111,7 @@ pub fn process(input: String) -> Result<String, FfiCoreError> {
 
 ## 6. ktlint 格式警告
 
-生成 Kotlin 时，uniffi 0.31 会尝试运行 `ktlint` 来格式化输出。
+生成 Kotlin 时，uniffi 会尝试运行 `ktlint` 来格式化输出。
 如果 `ktlint` 未安装，它会打印警告，但生成的代码是有效的。
 使用 `--no-format` 来抑制此警告。
 
