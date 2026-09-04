@@ -1,12 +1,12 @@
 ---
 name: uniffi
 title: Rust uniffi
-description: 给已有 Rust 库添加 uniffi proc-macros FFI 导出，生成 Kotlin 绑定。涵盖 FFI 包装层架构、Android NDK 交叉编译、Kotlin 绑定生成、以及生产环境 strip 工作流程。适用于 uniffi 0.31 和 0.32。
+description: 给已有 Rust 库添加 uniffi proc-macros FFI 导出，生成 Kotlin / Swift 绑定。涵盖 FFI 包装层架构、Android NDK 与 Apple 平台交叉编译、XCFramework 组装、以及生产环境 strip 工作流程。适用于 uniffi 0.31 和 0.32。
 tags: [rust, uniffi, android-ndk, kotlin, ffi, cross-compilation]
 ---
 # Rust uniffi
 
-给已有 Rust 库添加 uniffi proc-macros FFI 导出，交叉编译 Android 版本（通过 NDK），生成 Kotlin 绑定。
+给已有 Rust 库添加 uniffi proc-macros FFI 导出，交叉编译 Android（NDK）与 iOS/macOS（XCFramework）版本，生成 Kotlin / Swift 绑定。
 
 > **适用版本**：全部规则已在 uniffi 0.31 验证，并逐条核对 0.32 changelog 确认仍然成立。
 > 0.32 值得知道的新能力：`uniffi.toml` 支持 `excludes` 排除条目、proc-macro 支持 `HashSet`、
@@ -155,7 +155,7 @@ uniffi::setup_scaffolding!();
 - **ALWAYS 在 `[profile.release]` 中设置 `strip="none"` 和 `lto=false`**
 - **ALWAYS 从编译后的 .so 生成绑定**，而不是从源码
 - **ALWAYS 创建 `src/ffi.rs` FFI 包装层**，在其中定义 FFI 专用类型和 From 转换
-- **ALWAYS 在构建后使用 NDK 的 `llvm-strip` 来压缩 .so**（它保留 UNIFFI_META 元数据）
+- **ALWAYS 在构建后用工具链的 strip 压缩产物**（NDK `llvm-strip` / Xcode `strip` 只移除符号表，会保留 UNIFFI_META 字符串段）；顺序永远是先 bindgen、后 strip
 
 ---
 
@@ -279,9 +279,81 @@ ls ../src/main/java/uniffi/**/*.kt
 # 应有生成的 Kotlin 文件
 ```
 
+> NDK `llvm-strip` 路径中的 `prebuilt/linux-x86_64` 按宿主平台变化：
+> macOS 是 `darwin-x86_64`（或新版 NDK 的 `darwin-arm64`）。
+
 ---
 
-## Kotlin 端使用
+## 构建流程（iOS / macOS）
+
+与 Android 的差别：不需要 NDK / cargo-ndk，直接按 Apple target 编译 staticlib，
+生成 Swift 绑定后用 `xcodebuild` 组装 XCFramework。
+
+```bash
+# 0. 前置依赖（仅首次）
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin
+# x86_64-apple-ios / x86_64-apple-darwin 仅在需要支持 Intel 模拟器/Mac 时添加
+
+# 1. 按 target 编译（staticlib，strip=none，元数据完整）
+cargo build --release --target aarch64-apple-ios
+cargo build --release --target aarch64-apple-ios-sim
+cargo build --release --target aarch64-apple-darwin
+
+# 2. 生成 Swift 绑定（从 .a 读取 UNIFFI_META，library 模式同样适用）
+cargo run --features uniffi-cli --bin uniffi-bindgen -- generate \
+  --library target/aarch64-apple-ios/release/lib<LIB_NAME>.a \
+  --language swift --out-dir bindings/swift
+# 产出三类文件：<name>.swift、<name>FFI.h、<name>FFI.modulemap
+
+# 3. 准备 headers 目录（XCFramework 要求 modulemap 必须命名为 module.modulemap）
+mkdir -p bindings/swift/Headers
+cp bindings/swift/*FFI.h bindings/swift/Headers/
+cp bindings/swift/*FFI.modulemap bindings/swift/Headers/module.modulemap
+
+# 4. 组装 XCFramework
+xcodebuild -create-xcframework \
+  -library target/aarch64-apple-ios/release/lib<LIB_NAME>.a \
+    -headers bindings/swift/Headers \
+  -library target/aarch64-apple-ios-sim/release/lib<LIB_NAME>.a \
+    -headers bindings/swift/Headers \
+  -output <LIB_NAME>.xcframework
+# 多个同平台 slice（如模拟器 arm64 + x86_64）先用 lipo -create 合成一个 .a 再传入
+
+# 5. 验证（同 Android：先确认元数据还在，strip 永远在 bindgen 之后）
+strings target/aarch64-apple-ios/release/lib<LIB_NAME>.a | grep -c UNIFFI_META
+```
+
+### Xcode 集成
+
+- 把 `.xcframework` 拖入工程（或作为 SPM `binaryTarget` 引入），并把生成的
+  `<name>.swift` 加入 app target 的源码
+- 不走 XCFramework、直接在 Xcode 里编 Rust 时：加 Run Script 阶段编译并链接
+  `lib<name>.a`（Link Binary With Libraries），在 bridging header 里
+  `#include "<name>FFI.h"`，且该 header 必须在 Headers build phase 里标为 **Public**
+- 需要更细的产物控制（单独生成 headers/modulemap、XCFramework 兼容 modulemap、
+  自定义 module 名）时，把 bindgen 入口换成 Swift 专用版：
+
+```rust
+// bin/uniffi-bindgen-swift.rs
+fn main() { uniffi::uniffi_bindgen_swift() }
+```
+
+```bash
+cargo run --features uniffi-cli --bin uniffi-bindgen-swift -- \
+  target/aarch64-apple-ios/release/lib<LIB_NAME>.a bindings/swift --swift-sources
+```
+
+### Swift 6 注意
+
+uniffi 对 Swift 6 是**部分支持**：生成的代码大多符合 `Sendable`，但 async 代码的
+Sendable 标注尚未覆盖（见 mozilla/uniffi-rs#2448）。实现 foreign trait 的 Swift 类型
+也必须满足 `Sendable` 约束。
+
+---
+
+## 客户端调用
+
+### Kotlin
 
 ```kotlin
 import <PACKAGE_NAME>.*
@@ -294,6 +366,23 @@ lifecycleScope.launch {
     }
 }
 ```
+
+### Swift
+
+```swift
+import <MODULE_NAME>   // uniffi.toml 里 [bindings.swift] 的 module_name
+
+// Rust async fn → Swift async throws
+Task {
+    let results = try await search(query: "some query")
+    for r in results {
+        print("\(r.title) - score: \(r.score)")
+    }
+}
+```
+
+Rust 的 `Result<T, E>` 在两侧都映射为可抛错调用：Kotlin 抛 `FfiEngineError` 异常，
+Swift 是 `throws`——调用点必须 `try`。
 
 ---
 
