@@ -230,20 +230,22 @@ object in the title and the result on the confirming button; see the Design
 Guides for the copy rules.
 
 ```rust
-use gpui_kit::component::{button::ButtonVariant, dialog::DialogButtonProps};
+use gpui_kit::component::button::ButtonVariant;
 
 window.open_alert_dialog(cx, |alert, _, _| {
     alert
         .title("Remove “Roadmap”?")
         .description("Files on disk aren’t deleted.")
-        .button_props(
-            DialogButtonProps::default()
-                .ok_text("Remove")
-                .ok_variant(ButtonVariant::Danger)
-                .on_ok(|_, _, _| true),
-        )
+        .confirm()
+        .ok_text("Remove")
+        .ok_variant(ButtonVariant::Danger)
+        .on_ok(|_, _, _| true)
 });
 ```
+
+`button_props(DialogButtonProps)` takes the same properties as one value; it
+overrides only the fields that value sets, so `confirm` and earlier callbacks
+survive it.
 
 ### Notification
 
@@ -342,15 +344,18 @@ div()
 ### Switch Theme
 
 ```rust
-use gpui_kit::component::Theme;
+use gpui_kit::component::{Theme, ThemeMode};
 
-// Toggle light/dark
-cx.update_global::<Theme, _>(|theme, cx| {
-    theme.toggle_mode(cx);
-});
+// Switch light/dark: loads that mode's registered theme
+Theme::change(ThemeMode::Dark, None, cx);
+// or, as one edit among others
+Theme::update(cx, |theme| theme.mode = ThemeMode::Dark);
 
 // Load a named theme
-Theme::global_mut(cx).apply_config(&theme_config);
+Theme::update(cx, |theme| theme.apply_config(&theme_config));
+
+// Edit fields; `update` keeps colors, tokens and the Base projection in step
+Theme::update(cx, |theme| theme.radius = px(8.));
 ```
 
 ---

@@ -393,10 +393,16 @@ that state available to its components. Do not write a custom spacing snapshot
 into the global theme and expect a later `cx.theme().semantic_tokens()` call to
 return it.
 
-If code mutates the global GPUI Component theme directly, call
-`Theme::sync_base(cx)` afterward so Base-owned scrollbars and resize handles
-receive the new projection. `Theme::change(...)` performs this projection as
-part of a complete theme change.
+Edit the global GPUI Component theme through `Theme::update(cx, |theme| ...)`.
+The theme keeps the same colors twice (`colors` as solid colors, `tokens` as
+renderable backgrounds that may carry a gradient) and the Base layer holds a
+projection for its scrollbars and resize handles; `update` brings all three
+back in step after the closure and refreshes every window. An edit through
+`Theme::global_mut(cx)` updates only the field you touched — a sidebar can then
+paint its text from the new colors and its background from the old tokens —
+so it owns the rest: derive `tokens` from `colors`, call `Theme::sync_base(cx)`,
+refresh the windows. `Theme::change(...)` performs the projection as part of a
+complete theme change.
 
 An outward focus ring needs physical room. An ancestor with
 `overflow_hidden()` clips it. Prefer layouts that leave room; if a product must
@@ -414,9 +420,7 @@ base instead of becoming unrelated pixel constants.
 Change zoom by updating the base font and refreshing the window:
 
 ```rust
-Theme::global_mut(cx).font_size = px(18.);
-Theme::sync_base(cx);
-window.refresh();
+Theme::update(cx, |theme| theme.font_size = px(18.));
 ```
 
 The base font itself is a pixel value because it anchors the scale. Descendant
@@ -741,9 +745,11 @@ could only hint at.
   activation result. Never use them interchangeably.
 - **open/close** describes an overlay or disclosure state; **show/hide** is for
   transient presentation requests; **expand/collapse** describes structure.
-- **disabled** prevents interaction; **read-only** permits navigation and
+- **disabled** prevents interaction; **readonly** permits navigation and
   selection but prevents editing; **loading** prevents duplicate work while an
-  operation is pending.
+  operation is pending. Spell the state `readonly` — one word, as the
+  `readonly(bool)` builder and `is_readonly()` reader do — in identifiers,
+  interface labels, and documentation alike; never `read-only` or `read only`.
 - **index** is a current positional coordinate; **id** is stable identity;
   `IndexPath` represents hierarchical position. Do not persist or key
   reorderable data by index.
