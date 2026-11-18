@@ -24,7 +24,9 @@ Establish a durable visual contract for coding agents. Combine product-aware des
 4. **Update a contract**: preserve stable decisions, change only the requested dimensions, and explain migration impact.
 5. **Audit conformance**: compare the implemented UI and token sources against `DESIGN.md`; report concrete drift before changing code unless fixes were requested.
 
-## Discover context
+For a localized UI change or review under an existing contract, read the relevant sections of DESIGN.md, the affected component, and the tokens it consumes. Make or review the scoped change and check the affected states. Expand discovery only when a conflict, missing rule, or shared dependency affects the decision.
+
+## Discover context for a new direction or broader audit
 
 1. Run `git status --short` in a repository.
 2. Locate root instructions and design evidence with `rg --files`.
@@ -98,6 +100,7 @@ npx --yes @google/design.md lint DESIGN.md
 
 Fix schema, section-order, token-reference, and contrast errors. Then verify that:
 
+- each retained template example value (including colors, dimensions, and type sizes) has a source in project tokens, the observed interface, or a direction chosen by the user. Trace it to that source, or replace or omit it. Schema lint alone cannot establish this;
 - YAML tokens and prose agree;
 - referenced fonts and assets are actually available or have viable fallbacks;
 - light/dark, locale, mobile, keyboard, focus, and reduced-motion requirements are covered when applicable;
